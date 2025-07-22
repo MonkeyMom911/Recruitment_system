@@ -26,22 +26,63 @@ class DashboardController extends Controller
         $applicationsLast7Days = Application::whereIn('job_vacancy_id', $hrdJobVacancyIds)
             ->where('created_at', '>=', now()->subDays(7))
             ->count();
-        $upcomingInterviews = ApplicationStage::whereHas('application', function ($query) use ($hrdJobVacancyIds) {
-            $query->whereIn('job_vacancy_id', $hrdJobVacancyIds);
-        })->whereNotNull('scheduled_date')->where('scheduled_date', '>=', now())->orderBy('scheduled_date')->take(5)->get();
         $recentApplications = Application::with(['user', 'jobVacancy'])->whereIn('job_vacancy_id', $hrdJobVacancyIds)->latest()->take(5)->get();
+         // 1. [FIX] Calculate interviews scheduled for today
+        $interviewsTodayCount = ApplicationStage::whereHas('application', function ($query) use ($hrdJobVacancyIds) {
+                $query->whereIn('job_vacancy_id', $hrdJobVacancyIds);
+            })
+            ->whereDate('scheduled_date', now())
+            ->count();
+
+        // 2. [FIX] Get upcoming interviews (can include today's)
+        $upcomingInterviews = ApplicationStage::with(['application.user', 'application.jobVacancy'])
+            ->whereHas('application', function ($query) use ($hrdJobVacancyIds) {
+                $query->whereIn('job_vacancy_id', $hrdJobVacancyIds);
+            })
+            ->where('scheduled_date', '>=', now())
+            ->orderBy('scheduled_date', 'asc')
+            ->take(5)
+            ->get();
+
+        // 3. [FIX] Change data format for the status chart
         $applicationStatuses = Application::whereIn('job_vacancy_id', $hrdJobVacancyIds)
             ->select('status', DB::raw('count(*) as count'))
-            ->groupBy('status')->pluck('count', 'status');
+            ->groupBy('status')
+            ->get(); // Changed from pluck() to get() for correct array structure
 
+        // 4. [NEW] Add data for Weekly Applications chart
+        $weeklyApplicationsData = Application::whereIn('job_vacancy_id', $hrdJobVacancyIds)
+            ->where('created_at', '>=', now()->subDays(6))
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get();
+
+        // 5. [NEW] Add data for Monthly Applications chart
+        $monthlyApplications = Application::whereIn('job_vacancy_id', $hrdJobVacancyIds)
+            ->where('created_at', '>=', now()->startOfYear()) // Fetches data for the current year
+            ->select(
+                DB::raw('YEAR(created_at) as year'),
+                DB::raw('MONTH(created_at) as month'),
+                DB::raw('count(*) as count')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'asc')
+            ->orderBy('month', 'asc')
+            ->get();
+
+
+        // Pass all variables to the view
         return view('hrd.dashboard', compact(
-            'totalVacancies',
             'activeVacancies',
             'totalApplications',
             'applicationsLast7Days',
-            'upcomingInterviews',
             'recentApplications',
-            'applicationStatuses'
+            'interviewsTodayCount',      // <-- Added
+            'upcomingInterviews',
+            'applicationStatuses',       // <-- Format updated
+            'weeklyApplicationsData',    // <-- Added
+            'monthlyApplications'        // <-- Added
         ));
     }
 
