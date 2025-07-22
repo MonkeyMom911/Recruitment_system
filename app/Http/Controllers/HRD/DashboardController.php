@@ -133,6 +133,24 @@ class DashboardController extends Controller
         return view('hrd.reports.job-vacancies', compact('jobVacancies'));
     }
 
+    public function interviewsIndex()
+    {
+        $hrdId = auth()->id();
+        $hrdJobVacancyIds = JobVacancy::where('created_by', $hrdId)->pluck('id');
+
+        // Fetch all interviews (upcoming and past), ordered by the most recent schedule
+        $interviews = ApplicationStage::with(['application.user', 'application.jobVacancy'])
+            ->whereHas('application', function ($query) use ($hrdJobVacancyIds) {
+                $query->whereIn('job_vacancy_id', $hrdJobVacancyIds);
+            })
+            ->whereNotNull('scheduled_date')
+            ->orderBy('scheduled_date', 'desc') // Show most recent first
+            ->paginate(20); // Use pagination for long lists
+
+        // The view file we will create in the next step
+        return view('hrd.interviews.index', compact('interviews'));
+    }
+
     // [FUNGSI BARU] Mengekspor Laporan
     public function exportReport(Request $request)
     {

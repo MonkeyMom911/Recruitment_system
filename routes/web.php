@@ -59,7 +59,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // HRD routes
     Route::middleware(['role:hrd'])->prefix('hrd')->name('hrd.')->group(function () {
         Route::get('/dashboard', [HRDDashboardController::class, 'index'])->name('dashboard');
-
+        
+        Route::get('/interviews', [HRDDashboardController::class, 'interviewsIndex'])->name('interviews.index');
         // Job vacancy management
         Route::resource('job-vacancies', HRDJobVacancyController::class);
         Route::post('/job-vacancies/{jobVacancy}/toggle-status', [HRDJobVacancyController::class, 'toggleStatus'])->name('job-vacancies.toggle-status');
@@ -76,7 +77,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/application-stages/{applicationStage}/schedule', [HRDApplicationController::class, 'scheduleStage'])->name('application-stages.schedule');
         Route::post('/applications/{application}/notes', [HRDApplicationController::class, 'addNote'])->name('applications.notes.add');
 
-        // --- INI BAGIAN YANG DIPERBAIKI ---
+        
         // Report generation routes
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/applications', [HRDDashboardController::class, 'applicationsReport'])->name('applications');
